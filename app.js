@@ -44,7 +44,7 @@ function setStatus(message, isError = false) {
 }
 
 async function loadClassifier() {
-  const response = await fetch(MODEL_URL);
+  const response = await fetch(MODEL_URL, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Could not load sign_classifier.json (${response.status}).`);
   }
