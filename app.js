@@ -6,6 +6,7 @@ const MODEL_URL = "./sign_classifier.json";
 const HAND_MODEL_URL = "./hand_landmarker.task";
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm";
 const MIN_CONFIDENCE = 0.55;
+const DETECTION_INTERVAL_MS = 50;
 const CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -64,8 +65,8 @@ async function createLandmarker() {
     runningMode: "VIDEO",
     numHands: 1,
     minHandDetectionConfidence: 0.5,
-    minHandPresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
+    minHandPresenceConfidence: 0.4,
+    minTrackingConfidence: 0.4,
   });
   return landmarker;
 }
@@ -173,7 +174,7 @@ function renderFrame(now) {
   if (!cameraStream || isDetecting) return;
   drawMirroredVideo();
 
-  if (now - lastDetectionTime >= 100) {
+  if (now - lastDetectionTime >= DETECTION_INTERVAL_MS) {
     lastDetectionTime = now;
     isDetecting = true;
     try {
