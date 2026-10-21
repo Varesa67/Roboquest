@@ -120,7 +120,7 @@ function updateStablePrediction(prediction) {
     stablePrediction = null;
     resultHeading.textContent = "Uncertain";
     confidence.textContent =
-      `Low confidence · ${Math.round(prediction.confidence * 100)}% — try again`;
+      `Low confidence · ${Math.round(prediction.confidence * 100)}% — best guess: ${prediction.label}`;
     addButton.disabled = true;
     handIndicator.textContent = "Hand tracked";
     return;

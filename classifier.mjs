@@ -4,20 +4,24 @@ export function normalizeLandmarks(landmarks, frameWidth, frameHeight) {
   }
 
   const points = landmarks.map((point) => [
-    point.x * frameWidth,
-    point.y * frameHeight,
-    point.z * frameWidth,
+    Math.fround(point.x * frameWidth),
+    Math.fround(point.y * frameHeight),
+    Math.fround(point.z * frameWidth),
   ]);
-  const wrist = points[0];
+  const wrist = [...points[0]];
   for (const point of points) {
-    point[0] -= wrist[0];
-    point[1] -= wrist[1];
-    point[2] -= wrist[2];
+    point[0] = Math.fround(point[0] - wrist[0]);
+    point[1] = Math.fround(point[1] - wrist[1]);
+    point[2] = Math.fround(point[2] - wrist[2]);
   }
 
-  const scale = Math.hypot(points[9][0], points[9][1]);
+  const xSquared = Math.fround(points[9][0] * points[9][0]);
+  const ySquared = Math.fround(points[9][1] * points[9][1]);
+  const scale = Math.fround(Math.sqrt(Math.fround(xSquared + ySquared)));
   if (scale < 1e-6) return null;
-  return points.flatMap((point) => point.map((coordinate) => coordinate / scale));
+  return points.flatMap((point) =>
+    point.map((coordinate) => Math.fround(coordinate / scale))
+  );
 }
 
 export function predictForest(model, features) {
