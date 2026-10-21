@@ -5,6 +5,7 @@ import { appendLabel, normalizeLandmarks, predictForest } from "./classifier.mjs
 const MODEL_URL = "./sign_classifier.json";
 const HAND_MODEL_URL = "./hand_landmarker.task";
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm";
+const MIN_CONFIDENCE = 0.55;
 const CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -113,6 +114,17 @@ function drawLandmarks(landmarks) {
 
 function updateStablePrediction(prediction) {
   const now = performance.now();
+  if (prediction.confidence < MIN_CONFIDENCE) {
+    recentPredictions = [];
+    stablePrediction = null;
+    resultHeading.textContent = "Uncertain";
+    confidence.textContent =
+      `Low confidence · ${Math.round(prediction.confidence * 100)}% — try again`;
+    addButton.disabled = true;
+    handIndicator.textContent = "Hand tracked";
+    return;
+  }
+
   recentPredictions = recentPredictions.filter((entry) => now - entry.time < 900);
   recentPredictions.push({ ...prediction, time: now });
   if (recentPredictions.length > 7) recentPredictions.shift();
@@ -130,7 +142,7 @@ function updateStablePrediction(prediction) {
     }
   }
   const latest = recentPredictions.at(-1);
-  if (bestCount >= 4 && latest?.label === bestLabel && latest.confidence >= 0.4) {
+  if (bestCount >= 4 && latest?.label === bestLabel) {
     stablePrediction = latest;
     resultHeading.textContent = latest.label;
     confidence.textContent = `Steady · ${Math.round(latest.confidence * 100)}% confidence`;
