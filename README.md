@@ -1,95 +1,122 @@
-# Webcam Sign Landmark Trainer
+# Sign-to-text website files
 
-This project uses Google's MediaPipe Hand Landmarker to track the 21 points
-on one hand, then trains a small classifier from signs you record yourself.
-The camera app draws the hand landmarks on screen, saves labeled examples, and
-can show live predictions after training.
+This static site uses the trained Random Forest in the parent project folder.
+It runs hand tracking and sign predictions in the visitor's browser; it does
+not record training samples or upload camera images.
 
-This starter recognizes **static hand shapes** only. Moving signs such as ASL
-J and Z, continuous signing, facial expressions, body position, and ASL grammar
-are not included.
+## Files to upload
 
-## Website version
+Upload these six files together, preserving their names:
 
-The phone-friendly static site is in [`WebsiteCode/`](WebsiteCode/). It uses
-your trained classifier in the browser and has no sign-recording or training
-controls. See [`WebsiteCode/README.md`](WebsiteCode/README.md) for the upload
-files, HTTPS/camera requirements, and how to refresh the model after
-retraining.
+- `index.html`
+- `app.js`
+- `classifier.mjs`
+- `styles.css`
+- `sign_classifier.json`
+- `hand_landmarker.task`
 
-## Install (Windows, Python 3.12)
-
-Open PowerShell in this folder:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-If `.venv` does not exist yet:
+The site loads MediaPipe's JavaScript/WASM from jsDelivr. Users need internet
+access for that library; your sign classifier and hand-landmarker model are
+served from the website itself. Camera access requires HTTPS on the hosted
+site. To test locally, run a web server from this folder rather than opening
+`index.html` as a `file://` URL:
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+py -m http.server 8000
 ```
 
-## Record signs, train, and try them
+Then open `http://localhost:8000` in a supported browser and allow camera
+access.
 
-Start the app from this folder:
+## Export after retraining
+
+The checked-in `sign_classifier.json` is exported from
+`..\landmark_classifier.joblib`. If you retrain that model, run this from the
+`WebsiteCode` folder to regenerate the JSON before uploading:
 
 ```powershell
-.\.venv\Scripts\python.exe landmark_sign_app.py
+..\.venv\Scripts\python.exe export_model.py
 ```
 
-The first run downloads Google's hand-landmarker model into
-`models\hand_landmarker.task`. It needs internet for this one-time download;
-later runs can use that local file.
+Only upload your own model export. The website model predicts one sign per frame; **Add sign to sentence** commits
+a steady prediction to the editable sentence. Single-letter labels append as
+letters; `Hello` and `ILY` append as words. The buttons let the visitor add a
+space, edit, copy, or clear the sentence.
 
-With the camera window focused:
+## ESP32 and Arduino LCD
 
-1. Press **L**. In the PowerShell window, type a short label for the sign,
-   such as `hello`, and press Enter.
-2. Put one hand clearly in view and make that sign. Press **C** to start
-   collecting examples; press **C** again to stop. Examples are collected
-   about five times per second and saved to `landmark_samples.csv`.
-3. Change your hand position or orientation slightly, then record another
-   short batch with the same label. Aim for at least **30 examples per sign**
-   across a few batches. Use a steady sign: this version learns hand shapes,
-   not sign motion.
-4. Repeat steps 1–3 for at least **two different labels**. Keep your hand
-   visible and use similar framing and lighting.
-5. Press **T** to train. The app needs at least 10 recorded examples for each
-   of at least two labels. It saves the classifier as
-   `landmark_classifier.joblib` and turns live predictions on.
-6. Try each sign again under slightly different positioning. Press **P** to
-   turn live predictions on or off, and **Q** to quit.
+The **Send detected signs** panel connects to the ESP32 WebSocket server. Enter
+the ESP32's local address as `ws://ESP32-IP:81`, then select **Connect**. When
+the camera sees a new steady prediction at 55% confidence or higher, the page
+sends one `SIGN:<label>` text message. A held sign is not repeatedly sent;
+change signs before the same label can be sent again. The URL is saved in that
+browser.
 
-The app accepts the controls in either uppercase or lowercase. Press **Q** in
-the focused camera window to exit. Your landmark samples, trained
-classifier, and downloaded MediaPipe model are kept between runs.
+The browser and ESP32 must be reachable on the same local network. The existing
+ESP32 sketch serves unencrypted `ws://`, so an HTTPS-hosted website cannot
+connect directly to it; use the site locally over `http://localhost` for
+testing, or place a secure WebSocket proxy on a network reachable by both
+devices. Never expose the ESP32 WebSocket port directly to the public internet.
 
-## What the app learns
+Upload `espthing.ino` to the ESP32 after replacing `YOUR_WIFI_NAME` and
+`YOUR_WIFI_PASSWORD` with your Wi-Fi credentials. Set the Serial Monitor to
+115200 baud; after the ESP32 connects, it prints both the status-page address
+and WebSocket URL. Upload `arduinothing.ino` to an Uno-compatible Arduino.
+Install the `LiquidCrystal_I2C` library in Arduino IDE; the sketch assumes a
+16x2 LCD backpack at address `0x27`.
 
-MediaPipe locates 21 hand landmarks in each camera frame. The app moves those
-points relative to the wrist and scales them by hand size, then saves their
-coordinates with the label you entered. Pressing **T** trains a Random Forest
-classifier on the saved examples. MediaPipe tracks the hand; the classifier
-learns the labels. The app does not train MediaPipe itself.
+To see whether signs are arriving, open the printed HTTP status-page address
+in a browser, for example `http://192.168.1.50/`. It displays the last sign
+received and the number received. The WebSocket endpoint itself is not a
+regular webpage; enter the printed `ws://192.168.1.50:81` address in this
+website's **ESP32 WebSocket URL** field and connect. The browser and ESP32 must
+be on the same local network.
 
-## Tips
+### Wiring (Uno-compatible Arduino and 16x2 I2C LCD)
 
-- Start with two or three hand shapes that look noticeably different.
-- Use the same hand and keep your whole hand in the camera frame.
-- Record several separate batches per label and vary distance and position a
-  little; do not capture all examples from one unmoving frame.
-- Keep the camera window focused when using its keyboard controls. Pressing L
-  pauses the video while you type the label in PowerShell.
-- A displayed prediction is a best guess among the labels you recorded. The
-  app shows "Uncertain" for lower-confidence predictions, but the classifier
-  does not know unrecorded signs and is not a full ASL translator.
-- This project does not use the old color-histogram hand segmentation or the
-  old CNN model. The earlier scripts and their existing data/model files are
-  left in the folder unchanged; use `landmark_sign_app.py` for this workflow.
-- Do not load a `.joblib` model from a source you do not trust.
-cd C:\Users\hp\Downloads\SchoolProject
+| ESP32 / LCD | Arduino |
+| --- | --- |
+| ESP32 GPIO 17 (UART TX) | A0 (software UART RX) |
+| ESP32 GND | Arduino GND |
+| LCD SDA | A4 (SDA) |
+| LCD SCL | A5 (SCL) |
+| LCD VCC | 5V |
+| LCD GND | GND |
+
+The UART is one-way, 9600 baud; no Arduino-to-ESP32 TX wire is needed. Connect
+the grounds together. Power the Arduino and ESP32 from suitable supplies; do
+not connect the ESP32's 3.3V output to the LCD's 5V supply input. The ESP32 TX
+is 3.3V logic, which an Uno RX input normally recognizes. If using a different
+Arduino board, verify its SoftwareSerial pins and I2C pins before wiring. If
+the LCD stays blank, check its contrast adjustment and try the backpack's
+actual I2C address in the sketch.
+
+Predictions below 55% confidence are shown as **Uncertain** and cannot be
+added. Record more varied examples for signs that are repeatedly uncertain or
+misidentified, then retrain and export again.
+
+For more reliable predictions, face a light source so your palm is bright,
+keep the whole hand inside the camera view, and hold still briefly. The page
+checks for hand landmarks about 20 times per second and allows more tolerance
+for a temporary tracking-confidence drop when the hand turns.
+
+After replacing `sign_classifier.json` on your host, reload the page. The site
+requests the model without using the browser's cached copy. If your host has
+its own CDN or server cache, purge that cache or wait for it to expire.
+
+The current export has 26 labels: the static ASL letters A–I and K–Y, plus
+`Hello` and `ILY`. J and Z are absent because they require movement, while this
+classifier was trained on still hand shapes.
+
+## Model expectations
+
+The browser normalizes landmarks in the same way as the desktop recorder:
+mirror the frame, use 21 landmarks in wrist-relative coordinates, scale by the
+wrist-to-middle-knuckle distance, and flatten the 63 x/y/z values in landmark
+order. `export_model.py` turns each Random Forest tree into JSON for inference
+in `classifier.mjs`; this keeps the trained classifier and its classes without
+requiring Python on the hosted site.
+
+The current model must have 63 input features. To add labels/classes, collect
+examples and retrain with the desktop landmark app, then re-export. The
+website itself cannot train.

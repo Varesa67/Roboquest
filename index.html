@@ -4,13 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#10201d">
-    <title>Roboquest</title>
+    <title>Sign to Text</title>
     <link rel="stylesheet" href="./styles.css">
     <script type="module" src="./app.js"></script>
   </head>
   <body>
     <main class="page">
-      
+      <header class="page-header">
+        <p class="eyebrow">MEDIAPIPE · YOUR TRAINED MODEL</p>
+        <h1>Sign to Text</h1>
+        <p class="intro">Show a sign to the camera. Add each steady prediction to build a sentence.</p>
+      </header>
 
       <section class="camera-card" aria-label="Sign recognition camera">
         <div class="camera-stage">
@@ -35,6 +39,43 @@
         </div>
       </section>
 
+      <section class="connection-card" aria-labelledby="connection-heading">
+        <div>
+          <p class="eyebrow">ESP32 LINK</p>
+          <h2 id="connection-heading">Send detected signs</h2>
+          <p class="connection-help">
+            Connect to the ESP32 WebSocket. Each new steady, confident sign will
+            be sent once automatically.
+          </p>
+        </div>
+        <label class="connection-label" for="websocket-url">ESP32 WebSocket URL</label>
+        <input
+          id="websocket-url"
+          type="text"
+          inputmode="url"
+          autocomplete="url"
+          placeholder="ws://192.168.1.50:81"
+          aria-describedby="websocket-help"
+        >
+        <p id="websocket-help" class="connection-help">
+          Use the ESP32's local IP address and port 81. The browser and ESP32
+          must be on the same network. A hosted HTTPS page cannot connect directly
+          to this ESP32's unencrypted ws:// server.
+        </p>
+        <div class="connection-controls">
+          <button id="connect-button" class="button button-primary" type="button">
+            Connect
+          </button>
+          <button id="disconnect-button" class="button button-secondary" type="button" disabled>
+            Disconnect
+          </button>
+          <span id="connection-status" class="status" role="status" aria-live="polite">
+            Not connected
+          </span>
+        </div>
+        <p id="last-sent" class="connection-help">Last sign sent: none</p>
+      </section>
+
       <section class="result-card" aria-labelledby="result-heading">
         <div class="result-row">
           <div>
@@ -56,7 +97,10 @@
         </div>
       </section>
 
-     
+      <p class="note">
+        This model recognizes only the signs it was trained on. It is a hand-shape
+        demo, not a complete ASL translator.
+      </p>
     </main>
   </body>
 </html>

@@ -28,10 +28,18 @@ const resultHeading = document.querySelector("#result-heading");
 const confidence = document.querySelector("#confidence");
 const addButton = document.querySelector("#add-button");
 const sentence = document.querySelector("#sentence");
+const websocketUrlInput = document.querySelector("#websocket-url");
+const connectButton = document.querySelector("#connect-button");
+const disconnectButton = document.querySelector("#disconnect-button");
+const connectionStatus = document.querySelector("#connection-status");
+const lastSent = document.querySelector("#last-sent");
+const WEBSOCKET_URL_KEY = "sign-to-text-websocket-url";
 
 let classifier = null;
 let landmarker = null;
 let cameraStream = null;
+let espSocket = null;
+let lastSentLabel = null;
 let animationFrame = 0;
 let lastDetectionTime = 0;
 let lastTimestamp = 0;
@@ -43,6 +51,89 @@ let currentLandmarks = null;
 function setStatus(message, isError = false) {
   status.textContent = message;
   status.classList.toggle("status-error", isError);
+}
+
+function setConnectionStatus(message, isError = false) {
+  connectionStatus.textContent = message;
+  connectionStatus.classList.toggle("status-error", isError);
+}
+
+function sendStableSign() {
+  if (!stablePrediction || !espSocket || espSocket.readyState !== WebSocket.OPEN) return;
+  const label = stablePrediction.label;
+  if (label === lastSentLabel) return;
+  if (!/^[A-Za-z][A-Za-z -]{0,19}$/.test(label)) {
+    setConnectionStatus("This sign label contains unsupported characters.", true);
+    return;
+  }
+
+  espSocket.send(`SIGN:${label}`);
+  lastSentLabel = label;
+  lastSent.textContent = `Last sign sent: ${label}`;
+  setConnectionStatus(`Connected · sent ${label}`);
+}
+
+function disconnectEsp32() {
+  if (espSocket) {
+    const socket = espSocket;
+    espSocket = null;
+    socket.close();
+  }
+  lastSentLabel = null;
+  connectButton.disabled = false;
+  disconnectButton.disabled = true;
+  setConnectionStatus("Not connected");
+}
+
+function connectEsp32() {
+  const url = websocketUrlInput.value.trim();
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    setConnectionStatus("Enter a valid WebSocket URL, such as ws://192.168.1.50:81.", true);
+    return;
+  }
+  if (!["ws:", "wss:"].includes(parsedUrl.protocol) || !parsedUrl.hostname) {
+    setConnectionStatus("The URL must start with ws:// or wss://.", true);
+    return;
+  }
+  if (window.location.protocol === "https:" && parsedUrl.protocol === "ws:") {
+    setConnectionStatus("HTTPS pages cannot connect to an unencrypted ws:// address.", true);
+    return;
+  }
+
+  disconnectEsp32();
+  try {
+    localStorage.setItem(WEBSOCKET_URL_KEY, url);
+    const socket = new WebSocket(url);
+    espSocket = socket;
+    connectButton.disabled = true;
+    disconnectButton.disabled = false;
+    setConnectionStatus("Connecting…");
+
+    socket.addEventListener("open", () => {
+      if (espSocket !== socket) return;
+      lastSentLabel = null;
+      setConnectionStatus("Connected · waiting for a steady sign");
+      sendStableSign();
+    });
+    socket.addEventListener("error", () => {
+      if (espSocket === socket) {
+        setConnectionStatus("WebSocket error. Check the ESP32 URL and network.", true);
+      }
+    });
+    socket.addEventListener("close", () => {
+      if (espSocket !== socket) return;
+      espSocket = null;
+      lastSentLabel = null;
+      connectButton.disabled = false;
+      disconnectButton.disabled = true;
+      setConnectionStatus("Disconnected");
+    });
+  } catch (error) {
+    setConnectionStatus(`Could not connect: ${error.message}`, true);
+  }
 }
 
 async function loadClassifier() {
@@ -149,6 +240,7 @@ function updateStablePrediction(prediction) {
     confidence.textContent = `Steady · ${Math.round(latest.confidence * 100)}% confidence`;
     addButton.disabled = false;
     handIndicator.textContent = "Hand tracked";
+    sendStableSign();
     return;
   }
 
@@ -302,7 +394,19 @@ document.querySelector("#copy-button").addEventListener("click", async () => {
   }
 });
 
-window.addEventListener("pagehide", stopCamera);
+connectButton.addEventListener("click", connectEsp32);
+disconnectButton.addEventListener("click", disconnectEsp32);
+
+try {
+  websocketUrlInput.value = localStorage.getItem(WEBSOCKET_URL_KEY) || "";
+} catch (error) {
+  setConnectionStatus(`Could not load the saved ESP32 URL: ${error.message}`, true);
+}
+
+window.addEventListener("pagehide", () => {
+  stopCamera();
+  disconnectEsp32();
+});
 
 loadClassifier()
   .then(() => setStatus(`Ready · ${classifier.classes.length} trained signs loaded.`))
