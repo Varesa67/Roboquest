@@ -43,53 +43,51 @@ a steady prediction to the editable sentence. Single-letter labels append as
 letters; `Hello` and `ILY` append as words. The buttons let the visitor add a
 space, edit, copy, or clear the sentence.
 
-## ESP32 and Arduino LCD
+## Arduino UNO R4 WiFi and LCD
 
-The **Send detected signs** panel connects to the ESP32 WebSocket server. Enter
-the ESP32's local address as `ws://ESP32-IP:81`, then select **Connect**. When
-the camera sees a new steady prediction at 55% confidence or higher, the page
-sends one `SIGN:<label>` text message. A held sign is not repeatedly sent;
-change signs before the same label can be sent again. The URL is saved in that
-browser.
+The **Send detected signs** panel connects directly to the Arduino UNO R4
+WiFi's WebSocket server. Enter the board's local address as
+`ws://UNO-R4-IP:81`, then select **Connect**. When the camera sees a new steady
+prediction at 55% confidence or higher, the page sends one `SIGN:<label>` text
+message. A held sign is not repeatedly sent; change signs before the same label
+can be sent again. The URL is saved in that browser.
 
-The browser and ESP32 must be reachable on the same local network. The existing
-ESP32 sketch serves unencrypted `ws://`, so an HTTPS-hosted website cannot
-connect directly to it; use the site locally over `http://localhost` for
-testing, or place a secure WebSocket proxy on a network reachable by both
-devices. Never expose the ESP32 WebSocket port directly to the public internet.
+The browser and board must be reachable on the same local network. The board
+serves unencrypted `ws://`, so an HTTPS-hosted website cannot connect directly
+to it; use the site locally over `http://localhost` for testing, or place a
+secure WebSocket proxy on a network reachable by both devices. Never expose
+the board's WebSocket port directly to the public internet.
 
-Upload `espthing.ino` to the ESP32 after replacing `YOUR_WIFI_NAME` and
-`YOUR_WIFI_PASSWORD` with your Wi-Fi credentials. Set the Serial Monitor to
-115200 baud; after the ESP32 connects, it prints both the status-page address
-and WebSocket URL. Upload `arduinothing.ino` to an Uno-compatible Arduino.
-Install the `LiquidCrystal_I2C` library in Arduino IDE; the sketch assumes a
-16x2 LCD backpack at address `0x27`.
+### Upload the sketch
 
-To see whether signs are arriving, open the printed HTTP status-page address
-in a browser, for example `http://192.168.1.50/`. It displays the last sign
-received and the number received. The WebSocket endpoint itself is not a
-regular webpage; enter the printed `ws://192.168.1.50:81` address in this
-website's **ESP32 WebSocket URL** field and connect. The browser and ESP32 must
-be on the same local network.
+1. In Arduino IDE Boards Manager, install **Arduino UNO R4 Boards**. Install
+   the **WebSockets** library by Markus Sattler and a compatible
+   **LiquidCrystal_I2C** library.
+2. Open `ArduinoUnoR4WiFi\ArduinoUnoR4WiFi.ino`.
+3. Replace `YOUR_WIFI_NAME` and `YOUR_WIFI_PASSWORD` in the sketch with your
+   Wi-Fi credentials. Do not share a sketch containing your real password.
+4. Select **Arduino UNO R4 WiFi** and its connected port, then upload.
+5. Open Serial Monitor at **115200 baud**. Once connected, the board prints
+   the HTTP status-page address and WebSocket URL.
 
-### Wiring (Uno-compatible Arduino and 16x2 I2C LCD)
+Enter the printed `ws://...:81` address in the website's **Arduino WebSocket
+URL** field and connect. Open the printed `http://.../` address to view the
+last sign received and total count.
 
-| ESP32 / LCD | Arduino |
+### LCD wiring (16x2 I2C backpack)
+
+| LCD | Arduino UNO R4 WiFi |
 | --- | --- |
-| ESP32 GPIO 17 (UART TX) | A0 (software UART RX) |
-| ESP32 GND | Arduino GND |
-| LCD SDA | A4 (SDA) |
-| LCD SCL | A5 (SCL) |
-| LCD VCC | 5V |
-| LCD GND | GND |
+| SDA | SDA |
+| SCL | SCL |
+| VCC | 5V |
+| GND | GND |
 
-The UART is one-way, 9600 baud; no Arduino-to-ESP32 TX wire is needed. Connect
-the grounds together. Power the Arduino and ESP32 from suitable supplies; do
-not connect the ESP32's 3.3V output to the LCD's 5V supply input. The ESP32 TX
-is 3.3V logic, which an Uno RX input normally recognizes. If using a different
-Arduino board, verify its SoftwareSerial pins and I2C pins before wiring. If
-the LCD stays blank, check its contrast adjustment and try the backpack's
-actual I2C address in the sketch.
+The sketch assumes an I2C backpack at address `0x27`. If the LCD stays blank,
+check its contrast adjustment and try the backpack's actual I2C address in
+the sketch. No ESP32, second Arduino, or UART wiring is used in the new setup.
+The previous two sketches are retained in the root `archive` folder with
+`_archive` suffixes.
 
 Predictions below 55% confidence are shown as **Uncertain** and cannot be
 added. Record more varied examples for signs that are repeatedly uncertain or

@@ -38,7 +38,7 @@ const WEBSOCKET_URL_KEY = "sign-to-text-websocket-url";
 let classifier = null;
 let landmarker = null;
 let cameraStream = null;
-let espSocket = null;
+let boardSocket = null;
 let lastSentLabel = null;
 let animationFrame = 0;
 let lastDetectionTime = 0;
@@ -59,7 +59,7 @@ function setConnectionStatus(message, isError = false) {
 }
 
 function sendStableSign() {
-  if (!stablePrediction || !espSocket || espSocket.readyState !== WebSocket.OPEN) return;
+  if (!stablePrediction || !boardSocket || boardSocket.readyState !== WebSocket.OPEN) return;
   const label = stablePrediction.label;
   if (label === lastSentLabel) return;
   if (!/^[A-Za-z][A-Za-z -]{0,19}$/.test(label)) {
@@ -67,16 +67,16 @@ function sendStableSign() {
     return;
   }
 
-  espSocket.send(`SIGN:${label}`);
+  boardSocket.send(`SIGN:${label}`);
   lastSentLabel = label;
   lastSent.textContent = `Last sign sent: ${label}`;
   setConnectionStatus(`Connected · sent ${label}`);
 }
 
-function disconnectEsp32() {
-  if (espSocket) {
-    const socket = espSocket;
-    espSocket = null;
+function disconnectBoard() {
+  if (boardSocket) {
+    const socket = boardSocket;
+    boardSocket = null;
     socket.close();
   }
   lastSentLabel = null;
@@ -85,7 +85,7 @@ function disconnectEsp32() {
   setConnectionStatus("Not connected");
 }
 
-function connectEsp32() {
+function connectBoard() {
   const url = websocketUrlInput.value.trim();
   let parsedUrl;
   try {
@@ -103,29 +103,29 @@ function connectEsp32() {
     return;
   }
 
-  disconnectEsp32();
+  disconnectBoard();
   try {
     localStorage.setItem(WEBSOCKET_URL_KEY, url);
     const socket = new WebSocket(url);
-    espSocket = socket;
+    boardSocket = socket;
     connectButton.disabled = true;
     disconnectButton.disabled = false;
     setConnectionStatus("Connecting…");
 
     socket.addEventListener("open", () => {
-      if (espSocket !== socket) return;
+      if (boardSocket !== socket) return;
       lastSentLabel = null;
       setConnectionStatus("Connected · waiting for a steady sign");
       sendStableSign();
     });
     socket.addEventListener("error", () => {
-      if (espSocket === socket) {
-        setConnectionStatus("WebSocket error. Check the ESP32 URL and network.", true);
+      if (boardSocket === socket) {
+        setConnectionStatus("WebSocket error. Check the Uno R4 WiFi URL and network.", true);
       }
     });
     socket.addEventListener("close", () => {
-      if (espSocket !== socket) return;
-      espSocket = null;
+      if (boardSocket !== socket) return;
+      boardSocket = null;
       lastSentLabel = null;
       connectButton.disabled = false;
       disconnectButton.disabled = true;
@@ -394,18 +394,18 @@ document.querySelector("#copy-button").addEventListener("click", async () => {
   }
 });
 
-connectButton.addEventListener("click", connectEsp32);
-disconnectButton.addEventListener("click", disconnectEsp32);
+connectButton.addEventListener("click", connectBoard);
+disconnectButton.addEventListener("click", disconnectBoard);
 
 try {
   websocketUrlInput.value = localStorage.getItem(WEBSOCKET_URL_KEY) || "";
 } catch (error) {
-  setConnectionStatus(`Could not load the saved ESP32 URL: ${error.message}`, true);
+  setConnectionStatus(`Could not load the saved Arduino URL: ${error.message}`, true);
 }
 
 window.addEventListener("pagehide", () => {
   stopCamera();
-  disconnectEsp32();
+  disconnectBoard();
 });
 
 loadClassifier()
