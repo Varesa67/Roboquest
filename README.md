@@ -54,25 +54,76 @@ can be sent again. The URL is saved in that browser.
 
 The browser and board must be reachable on the same local network. The board
 serves unencrypted `ws://`, so an HTTPS-hosted website cannot connect directly
-to it; use the site locally over `http://localhost` for testing, or place a
-secure WebSocket proxy on a network reachable by both devices. Never expose
-the board's WebSocket port directly to the public internet.
+to it. Use the site locally over `http://localhost` for direct connection, or
+run the local WSS bridge below on the same computer that opens GitHub Pages.
+The bridge forwards messages to the Uno over Wi-Fi; you do not need to buy a
+server. Never expose the board's WebSocket port directly to the public internet.
+
+### GitHub Pages local WSS bridge
+
+The bridge listens only on this computer, accepts connections from the
+configured GitHub Pages origin, and forwards valid `SIGN:<label>` messages to
+the Uno. The board and computer must be on the same Wi-Fi network. This
+supports using GitHub Pages in a browser on the bridge computer; it does not
+make the Uno accessible to other website visitors.
+
+1. Install Node.js LTS and `mkcert`. On Windows with WinGet, install mkcert
+   with `winget install FiloSottile.mkcert`.
+2. In PowerShell, create and trust a local certificate:
+
+   ```powershell
+   mkcert -install
+   $certDir = Join-Path $env:LOCALAPPDATA "uno-wss-bridge"
+   New-Item -ItemType Directory -Force $certDir
+   mkcert -cert-file (Join-Path $certDir "localhost.pem") `
+     -key-file (Join-Path $certDir "localhost-key.pem") localhost 127.0.0.1
+   ```
+
+3. From the repository root, install the bridge dependency once:
+
+   ```powershell
+   cd .\local-bridge
+   npm.cmd install
+   ```
+
+4. Start the bridge. Replace the Uno IP address with the one printed by the
+   Arduino. For a Pages URL such as
+   `https://Varesa67.github.io/Roboquest/`, use the origin
+   `https://Varesa67.github.io`:
+
+   ```powershell
+   $env:UNO_WS_URL = "ws://192.168.1.50:81"
+   $env:GITHUB_PAGES_ORIGIN = "https://Varesa67.github.io"
+   $env:TLS_CERT_PATH = Join-Path $env:LOCALAPPDATA "uno-wss-bridge\localhost.pem"
+   $env:TLS_KEY_PATH = Join-Path $env:LOCALAPPDATA "uno-wss-bridge\localhost-key.pem"
+   npm.cmd start
+   ```
+
+5. Copy the full `wss://127.0.0.1:8443/?token=...` URL printed by the bridge
+   into the website's **Arduino WebSocket URL** field. Keep the PowerShell
+   window open while using the site. The token changes whenever the bridge
+   restarts, so enter the newly printed URL after each restart.
+
+If the browser reports a certificate error, ensure `mkcert -install` succeeded
+and restart the browser. The existing `http://localhost` method remains
+available for using a local copy of the site.
 
 ### Upload the sketch
 
 1. In Arduino IDE Boards Manager, install **Arduino UNO R4 Boards**. Install
    the **WebSockets** library by Markus Sattler and a compatible
    **LiquidCrystal_I2C** library.
-2. Open `ArduinoUnoR4WiFi\ArduinoUnoR4WiFi.ino`.
+2. Open `ArduinoUnoR4WiFi.ino`.
 3. Replace `YOUR_WIFI_NAME` and `YOUR_WIFI_PASSWORD` in the sketch with your
    Wi-Fi credentials. Do not share a sketch containing your real password.
 4. Select **Arduino UNO R4 WiFi** and its connected port, then upload.
 5. Open Serial Monitor at **115200 baud**. Once connected, the board prints
    the HTTP status-page address and WebSocket URL.
 
-Enter the printed `ws://...:81` address in the website's **Arduino WebSocket
-URL** field and connect. Open the printed `http://.../` address to view the
-last sign received and total count.
+For a local HTTP copy, enter the printed `ws://...:81` address in the website's
+**Arduino WebSocket URL** field. For GitHub Pages, enter the bridge's printed
+`wss://...` address instead. Open the printed `http://.../` board address to
+view the last sign received and total count.
 
 ### LCD wiring (16x2 I2C backpack)
 

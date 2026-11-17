@@ -99,7 +99,10 @@ function connectBoard() {
     return;
   }
   if (window.location.protocol === "https:" && parsedUrl.protocol === "ws:") {
-    setConnectionStatus("HTTPS pages cannot connect to an unencrypted ws:// address.", true);
+    setConnectionStatus(
+      "GitHub Pages cannot connect directly to ws://. Start the local WSS bridge on this computer and use its printed wss://127.0.0.1 URL; see README.md.",
+      true,
+    );
     return;
   }
 
@@ -120,7 +123,10 @@ function connectBoard() {
     });
     socket.addEventListener("error", () => {
       if (boardSocket === socket) {
-        setConnectionStatus("WebSocket error. Check the Uno R4 WiFi URL and network.", true);
+        setConnectionStatus(
+          "WebSocket error. Check that the local bridge is running, its certificate is trusted, and the Uno is reachable.",
+          true,
+        );
       }
     });
     socket.addEventListener("close", () => {
